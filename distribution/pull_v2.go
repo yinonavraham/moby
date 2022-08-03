@@ -373,6 +373,7 @@ func (p *puller) pullTag(ctx context.Context, ref reference.Named, platform *spe
 	} else {
 		return false, fmt.Errorf("internal error: reference has neither a tag nor a digest: %s", reference.FamiliarString(ref))
 	}
+	updateRepoWithManifestInfo(p.repo, ref, dgst)
 
 	ctx = log.WithLogger(ctx, logrus.WithFields(
 		logrus.Fields{
@@ -831,6 +832,11 @@ func (p *puller) pullManifestList(ctx context.Context, ref reference.Named, mfst
 	}
 	logrus.Debugf("%s resolved to a manifestList object with %d entries; looking for a %s/%s match", ref, len(mfstList.Manifests), platforms.Format(platform), runtime.GOARCH)
 
+	// Prepare a function to restore the manifest info tracked by the repo and make sure it is restored when this func
+	// is done. This is also used to restore the state before each manifest match.
+	restoreManifestInfo := prepareRestoreRepoWithManifestInfo(p.repo)
+	defer restoreManifestInfo()
+
 	manifestMatches := filterManifests(mfstList.Manifests, platform)
 
 	for _, match := range manifestMatches {
@@ -852,6 +858,11 @@ func (p *puller) pullManifestList(ctx context.Context, ref reference.Named, mfst
 		if err != nil {
 			return "", "", err
 		}
+
+		// Restore the manifest info tracked by the repo, to reset the state as was before the previous match (if any)
+		// and add the manifest digest of the current match
+		restoreManifestInfo()
+		addDigestToRepoWithManifestInfo(p.repo, match.Digest)
 
 		switch v := manifest.(type) {
 		case *schema1.SignedManifest:

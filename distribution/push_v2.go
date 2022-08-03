@@ -125,6 +125,7 @@ func (p *pusher) pushRepository(ctx context.Context) (err error) {
 
 func (p *pusher) pushTag(ctx context.Context, ref reference.NamedTagged, id digest.Digest) error {
 	logrus.Debugf("Pushing repository: %s", reference.FamiliarString(ref))
+	updateRepoWithManifestInfo(p.repo, ref)
 
 	imgConfig, err := p.config.ImageStore.Get(ctx, id)
 	if err != nil {
